@@ -234,6 +234,7 @@ public class J2CVarScan extends JavaBaseListener {
 			} else if (containsFromList(clsMethodList, text, type)) {
 				rewriter.replace(id.getSymbol(), getCurrentClassName() + "_"
 						+ text);
+				
 			} else {
 				System.out.println("warn:unknow id:" + text);
 			}
@@ -243,6 +244,8 @@ public class J2CVarScan extends JavaBaseListener {
 				String t = tokens.get(next).getText();
 				if (".".equals(t)) {
 					rewriter.replace(next, "->");
+				}else if  ("(".equals(t)) {
+					rewriter.insertAfter(next, "self, ");
 				}
 
 			}

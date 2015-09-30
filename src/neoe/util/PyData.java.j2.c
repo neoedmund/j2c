@@ -56,13 +56,13 @@
         if (i != c) {
             throw new Exception("Expected to read " + c + " but " + i
                     + "(" + ((int) i)
-                    + ") found" + neoe_util_PyData_at());
+                    + ") found" + neoe_util_PyData_at(self, ));
         }
     }
 
     void neoe_util_PyData_confirm(neoe_util_PyData* self, Reader in, char c) throws Exception {
         char i = neoe_util_PyData_readA(in);
-        neoe_util_PyData_confirm(i, c);
+        neoe_util_PyData_confirm(self, i, c);
     }
 
     Object neoe_util_PyData_parse(neoe_util_PyData* self, Reader in) throws Exception {
@@ -71,10 +71,10 @@
         if (i == '/') {
             char i2 = neoe_util_PyData_xread(in);
             if (i2 == '*') {
-                neoe_util_PyData_skipUtil(in, "*/");
+                neoe_util_PyData_skipUtil(self, in, "*/");
                 i = neoe_util_PyData_readA(in);
             } else {
-                neoe_util_PyData_pushBack(i2);
+                neoe_util_PyData_pushBack(self, i2);
             }
         }
 
@@ -84,32 +84,32 @@
 
         if (i == '{') {
             Map m = new HashMap();
-            neoe_util_PyData_readMap(in, m, '}');
+            neoe_util_PyData_readMap(self, in, m, '}');
             return m;
         }
         if (i == '[') {
             List l = new ArrayList();
-            neoe_util_PyData_readList(in, l, ']');
+            neoe_util_PyData_readList(self, in, l, ']');
             return l;
         }
         if (i == '(') {
             List l = new ArrayList();
-            neoe_util_PyData_readList(in, l, ')');
+            neoe_util_PyData_readList(self, in, l, ')');
             return l;
         }
         if (i == '"') {
-            String s = neoe_util_PyData_readString(in, '"');
+            String s = neoe_util_PyData_readString(self, in, '"');
             return s;
         }
         if (i == '\'') {
-            String s = neoe_util_PyData_readString(in, '\'');
+            String s = neoe_util_PyData_readString(self, in, '\'');
             return s;
         }
-        return neoe_util_PyData_readDecimal(in, i);
+        return neoe_util_PyData_readDecimal(self, in, i);
     }
 
     /*public*/ Object neoe_util_PyData_parseAll(neoe_util_PyData* self, Reader in) throws Exception {
-        Object o = neoe_util_PyData_parse(in);
+        Object o = neoe_util_PyData_parse(self, in);
         char i = neoe_util_PyData_readA(in);
         if (i == self->EOF) {
             in->close();
@@ -145,10 +145,10 @@
             if (i == '/') {
                 char i2 = neoe_util_PyData_xread(in);
                 if (i2 == '*') {
-                    neoe_util_PyData_skipUtil(in, "*/");
+                    neoe_util_PyData_skipUtil(self, in, "*/");
                     i = neoe_util_PyData_xread(in);
                 } else {
-                    neoe_util_PyData_pushBack(i2);
+                    neoe_util_PyData_pushBack(self, i2);
                     return i;
                 }
             } else {
@@ -164,7 +164,7 @@
             char i = neoe_util_PyData_xread(in);
             if (i == self->EOF || i == ' ' || i == '\n' || i == '\r' || i == '\t'
                     || i == ',' || i == '}' || i == ')' || i == ']' || i == ':') {
-                neoe_util_PyData_pushBack(i);
+                neoe_util_PyData_pushBack(self, i);
                 break;
             }
             sb->append(i);
@@ -181,19 +181,19 @@
             char i = neoe_util_PyData_readA(in);
             if (i == self->EOF) {
                 throw new Exception("Expected to read " + end
-                        + " but EOF found" + neoe_util_PyData_at());
+                        + " but EOF found" + neoe_util_PyData_at(self, ));
             }
             if (i == end) {
                 return;
             }
-            neoe_util_PyData_pushBack(i);
-            Object e = neoe_util_PyData_parse(in);
+            neoe_util_PyData_pushBack(self, i);
+            Object e = neoe_util_PyData_parse(self, in);
             l->add(e);
             i = neoe_util_PyData_readA(in);
             if (i == end) {
                 return;
             }
-            neoe_util_PyData_confirm(i, ',');
+            neoe_util_PyData_confirm(self, i, ',');
         }
     }
 
@@ -202,21 +202,21 @@
             char i = neoe_util_PyData_readA(in);
             if (i == self->EOF) {
                 throw new Exception("Expected to read " + end
-                        + " but EOF found" + neoe_util_PyData_at());
+                        + " but EOF found" + neoe_util_PyData_at(self, ));
             }
             if (i == end) {
                 return;
             }
-            neoe_util_PyData_pushBack(i);
-            Object key = neoe_util_PyData_parse(in);
-            neoe_util_PyData_confirm(in, ':');
-            Object value = neoe_util_PyData_parse(in);
+            neoe_util_PyData_pushBack(self, i);
+            Object key = neoe_util_PyData_parse(self, in);
+            neoe_util_PyData_confirm(self, in, ':');
+            Object value = neoe_util_PyData_parse(self, in);
             m->put(key, value);
             i = neoe_util_PyData_readA(in);
             if (i == end) {
                 return;
             }
-            neoe_util_PyData_confirm(i, ',');
+            neoe_util_PyData_confirm(self, i, ',');
         }
     }
 
@@ -231,7 +231,7 @@
                     i = neoe_util_PyData_xread(in);
                     continue;
                 } else {
-                    neoe_util_PyData_pushBack(i2);
+                    neoe_util_PyData_pushBack(self, i2);
                     break;
                 }
             }
@@ -240,7 +240,7 @@
             }
             if (i == self->EOF) {
                 throw new Exception("Expected to read " + end
-                        + " but EOF found" + neoe_util_PyData_at());
+                        + " but EOF found" + neoe_util_PyData_at(self, ));
             }
             sb->append(i);
             i = neoe_util_PyData_xread(in);
