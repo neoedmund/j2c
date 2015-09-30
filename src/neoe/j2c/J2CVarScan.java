@@ -16,16 +16,20 @@ import org.antlr.v4.runtime.TokenStream;
 import org.antlr.v4.runtime.TokenStreamRewriter;
 import org.antlr.v4.runtime.tree.TerminalNode;
 
+import neoe.j2c.JavaParser.BlockContext;
 import neoe.j2c.JavaParser.BlockStatementContext;
 import neoe.j2c.JavaParser.ClassBodyDeclarationContext;
 import neoe.j2c.JavaParser.ClassDeclarationContext;
 import neoe.j2c.JavaParser.FieldDeclarationContext;
+import neoe.j2c.JavaParser.FormalParameterContext;
 import neoe.j2c.JavaParser.FormalParameterListContext;
 import neoe.j2c.JavaParser.FormalParametersContext;
+import neoe.j2c.JavaParser.LocalVariableDeclarationContext;
 import neoe.j2c.JavaParser.LocalVariableDeclarationStatementContext;
 import neoe.j2c.JavaParser.MemberDeclarationContext;
 import neoe.j2c.JavaParser.MethodDeclarationContext;
 import neoe.j2c.JavaParser.PackageDeclarationContext;
+import neoe.j2c.JavaParser.PrimaryContext;
 import neoe.j2c.JavaParser.VariableDeclaratorContext;
 
 /**
@@ -56,10 +60,14 @@ public class J2CVarScan extends JavaBaseListener {
 	@Override
 	public void exitClassDeclaration(ClassDeclarationContext ctx) {
 		clsNames.pop(); // remove last one
-		
+		clsFieldList.pop();
+		clsMethodList.pop();
+
 	}
 
 	Stack<List<String>> clsFieldList = new Stack();
+	Stack<List<String>> clsMethodList = new Stack();
+	Stack<List<String>> blockVarList = new Stack();
 
 	@Override
 	public void enterClassDeclaration(JavaParser.ClassDeclarationContext ctx) {
@@ -67,14 +75,17 @@ public class J2CVarScan extends JavaBaseListener {
 		clsNames.add(ctx.Identifier().getText());
 		System.out.println("cls=" + getCurrentClassName());
 		JavaParser.ClassBodyContext body = ctx.classBody();
+		List<String> clsFields = new ArrayList();
+		clsFieldList.add(clsFields);
+		ArrayList<String> ml;
+		clsMethodList.add(ml=new ArrayList<String>());
 		for (ClassBodyDeclarationContext cbd : body.classBodyDeclaration()) {
 			MemberDeclarationContext md = cbd.memberDeclaration();
 			if (md != null) {
 				{
 					FieldDeclarationContext fd = md.fieldDeclaration();
 					if (fd != null) {
-						List<String> clsFields = new ArrayList();
-						clsFieldList.add(clsFields);
+
 						List<String> fn;
 						System.out.println(fn = getFieldName(fd.variableDeclarators().variableDeclarator()));
 						clsFields.addAll(fn);
@@ -84,6 +95,7 @@ public class J2CVarScan extends JavaBaseListener {
 					MethodDeclarationContext med = md.methodDeclaration();
 					if (med != null) {
 						TerminalNode id = med.Identifier();
+						ml.add(id.getText());
 						rewriter.replace(id.getSymbol(), getCurrentClassName() + "_" + id.getText());
 						FormalParametersContext fp = med.formalParameters();
 						FormalParameterListContext fpl = fp.formalParameterList();
@@ -96,6 +108,33 @@ public class J2CVarScan extends JavaBaseListener {
 				}
 			}
 		}
+	}
+
+	List<String> methodParams = new ArrayList<String>();
+
+	@Override
+	public void enterMethodDeclaration(MethodDeclarationContext ctx) {
+		assert methodParams.isEmpty();
+		FormalParametersContext fp = ctx.formalParameters();
+		FormalParameterListContext fpl = fp.formalParameterList();
+		if (fpl == null) {
+		} else {
+			methodParams.addAll(getParamNames(fpl.formalParameter()));
+			System.out.println("params of " + ctx.Identifier().getText() + ":" + methodParams);
+		}
+	}
+
+	private List<String> getParamNames(List<FormalParameterContext> list) {
+		List<String> ret = new ArrayList<String>();
+		for (FormalParameterContext fp : list) {
+			ret.add(fp.variableDeclaratorId().getText());
+		}
+		return ret;
+	}
+
+	@Override
+	public void exitMethodDeclaration(MethodDeclarationContext ctx) {
+		methodParams.clear();
 	}
 
 	private String getCurrentClassName() {
@@ -119,6 +158,53 @@ public class J2CVarScan extends JavaBaseListener {
 	}
 
 	@Override
+	public void enterPrimary(PrimaryContext ctx) {
+		TerminalNode id = ctx.Identifier();
+		if (id != null) {
+			String text = id.getText();
+			if (isClassField(text)) {
+				rewriter.insertBefore(id.getSymbol(), "self->");
+			} else {
+				if (containsFromList(clsMethodList, text)) {
+					rewriter.insertBefore(id.getSymbol(), getCurrentClassName() + "_" + text);
+				} else{
+					System.out.println("warn:unknow id:" + text);
+				}
+			}
+		}
+	}
+
+	/** not support nested class fields yet. */
+	private boolean isClassField(String text) {
+		if (containsFromList(blockVarList, text))
+			return false;
+		if (methodParams.contains(text))
+			return false;
+		if (containsFromList(clsFieldList, text))
+			return true;
+		
+		return false;
+	}
+
+	private boolean containsFromList(Stack<List<String>> list, String text) {
+		for (List<String> lvl : list) {
+			if (lvl.contains(text))
+				return true;
+		}
+		return false;
+	}
+
+	@Override
+	public void enterLocalVariableDeclaration(LocalVariableDeclarationContext ctx) {
+		blockVarList.peek().addAll(getFieldName(ctx.variableDeclarators().variableDeclarator()));
+	}
+
+	@Override
+	public void exitBlock(BlockContext ctx) {
+		blockVarList.pop();
+	}
+
+	@Override
 	public void enterBlock(JavaParser.BlockContext ctx) {
 		System.out.println("enter block [" + ctx.start + "," + ctx.stop + "]");
 		for (BlockStatementContext bs : ctx.blockStatement()) {
@@ -128,5 +214,6 @@ public class J2CVarScan extends JavaBaseListener {
 						getFieldName(lvds.localVariableDeclaration().variableDeclarators().variableDeclarator()));
 			}
 		}
+		blockVarList.add(new ArrayList<String>());
 	}
 }
