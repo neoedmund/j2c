@@ -1,20 +1,12 @@
 package neoe.j2c;
 
-import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.Stack;
-
-/***
- * Excerpted from "The Definitive ANTLR 4 Reference",
- * published by The Pragmatic Bookshelf.
- * Copyrights apply to this code. It may not be used to create training material, 
- * courses, books, articles, and the like. Contact us if you are in doubt.
- * We make no guarantees that this code is fit for any purpose. 
- * Visit http://www.pragmaticprogrammer.com/titles/tpantlr2 for more book information.
-***/
-import org.antlr.v4.runtime.TokenStream;
-import org.antlr.v4.runtime.TokenStreamRewriter;
-import org.antlr.v4.runtime.tree.TerminalNode;
 
 import neoe.j2c.JavaParser.BlockContext;
 import neoe.j2c.JavaParser.BlockStatementContext;
@@ -24,13 +16,33 @@ import neoe.j2c.JavaParser.FieldDeclarationContext;
 import neoe.j2c.JavaParser.FormalParameterContext;
 import neoe.j2c.JavaParser.FormalParameterListContext;
 import neoe.j2c.JavaParser.FormalParametersContext;
+import neoe.j2c.JavaParser.ImportDeclarationContext;
 import neoe.j2c.JavaParser.LocalVariableDeclarationContext;
 import neoe.j2c.JavaParser.LocalVariableDeclarationStatementContext;
 import neoe.j2c.JavaParser.MemberDeclarationContext;
 import neoe.j2c.JavaParser.MethodDeclarationContext;
+import neoe.j2c.JavaParser.ModifierContext;
 import neoe.j2c.JavaParser.PackageDeclarationContext;
 import neoe.j2c.JavaParser.PrimaryContext;
+import neoe.j2c.JavaParser.TypeContext;
+import neoe.j2c.JavaParser.TypeDeclarationContext;
 import neoe.j2c.JavaParser.VariableDeclaratorContext;
+import neoe.util.PyData;
+
+
+
+
+/***
+ * Excerpted from "The Definitive ANTLR 4 Reference",
+ * published by The Pragmatic Bookshelf.
+ * Copyrights apply to this code. It may not be used to create training material, 
+ * courses, books, articles, and the like. Contact us if you are in doubt.
+ * We make no guarantees that this code is fit for any purpose. 
+ * Visit http://www.pragmaticprogrammer.com/titles/tpantlr2 for more book information.
+ ***/
+import org.antlr.v4.runtime.TokenStream;
+import org.antlr.v4.runtime.TokenStreamRewriter;
+import org.antlr.v4.runtime.tree.TerminalNode;
 
 /**
  * Hope to solve 80% of problem of java to c. 1. change method signature(name,
@@ -46,14 +58,17 @@ public class J2CVarScan extends JavaBaseListener {
 	private String pkg;
 	/** support nested class */
 	private Stack<String> clsNames = new Stack<String>();
+	private TokenStream tokens;
 
 	public J2CVarScan(TokenStream tokens) {
 		rewriter = new TokenStreamRewriter(tokens);
+		this.tokens = tokens;
 	}
 
 	@Override
 	public void enterPackageDeclaration(PackageDeclarationContext ctx) {
 		pkg = ctx.qualifiedName().getText();
+		rewriter.insertBefore(ctx.start, "// ");
 		System.out.println("package " + pkg);
 	}
 
@@ -65,20 +80,37 @@ public class J2CVarScan extends JavaBaseListener {
 
 	}
 
-	Stack<List<String>> clsFieldList = new Stack();
-	Stack<List<String>> clsMethodList = new Stack();
-	Stack<List<String>> blockVarList = new Stack();
+	@Override
+	public void enterImportDeclaration(ImportDeclarationContext ctx) {
+		rewriter.insertBefore(ctx.start, "// ");
+	}
+
+	Stack<Map<String, String>> clsFieldList = new Stack();
+	Stack<Map<String, String>> clsMethodList = new Stack();
+	Stack<Map<String, String>> blockVarList = new Stack();
+
+	@Override
+	public void enterTypeDeclaration(TypeDeclarationContext ctx) {
+		ClassDeclarationContext cd = ctx.classDeclaration();
+		if (cd!=null){
+		rewriter.insertBefore(ctx.start, "// ");
+		rewriter.insertBefore(cd.stop, "// ");
+		rewriter.insertAfter(cd.stop, "/*cls*/\n");
+		}
+	}	
 
 	@Override
 	public void enterClassDeclaration(JavaParser.ClassDeclarationContext ctx) {
-		System.out.println("enter class [" + ctx.Identifier() + "|" + ctx.start + "," + ctx.stop + "]");
+		System.out.println("enter class [" + ctx.Identifier() + "|" + ctx.start
+				+ "," + ctx.stop + "]");
 		clsNames.add(ctx.Identifier().getText());
+		
 		System.out.println("cls=" + getCurrentClassName());
 		JavaParser.ClassBodyContext body = ctx.classBody();
-		List<String> clsFields = new ArrayList();
+		Map<String, String> clsFields = new HashMap();
 		clsFieldList.add(clsFields);
-		ArrayList<String> ml;
-		clsMethodList.add(ml=new ArrayList<String>());
+		HashMap ml;
+		clsMethodList.add(ml = new HashMap());
 		for (ClassBodyDeclarationContext cbd : body.classBodyDeclaration()) {
 			MemberDeclarationContext md = cbd.memberDeclaration();
 			if (md != null) {
@@ -86,23 +118,28 @@ public class J2CVarScan extends JavaBaseListener {
 					FieldDeclarationContext fd = md.fieldDeclaration();
 					if (fd != null) {
 
-						List<String> fn;
-						System.out.println(fn = getFieldName(fd.variableDeclarators().variableDeclarator()));
-						clsFields.addAll(fn);
+						getFieldName(fd.variableDeclarators()
+								.variableDeclarator(), clsFields,
+								getTypeText(fd.type()));
+
 					}
 				}
 				{
 					MethodDeclarationContext med = md.methodDeclaration();
 					if (med != null) {
 						TerminalNode id = med.Identifier();
-						ml.add(id.getText());
-						rewriter.replace(id.getSymbol(), getCurrentClassName() + "_" + id.getText());
+						ml.put(id.getText(), getTypeText(med.type()));
+						rewriter.replace(id.getSymbol(), getCurrentClassName()
+								+ "_" + id.getText());
 						FormalParametersContext fp = med.formalParameters();
-						FormalParameterListContext fpl = fp.formalParameterList();
+						FormalParameterListContext fpl = fp
+								.formalParameterList();
 						if (fpl == null) {
-							rewriter.insertAfter(fp.start.getTokenIndex(), getCurrentClassName() + "* self");
+							rewriter.insertAfter(fp.start.getTokenIndex(),
+									getCurrentClassName() + "* self");
 						} else {
-							rewriter.insertAfter(fp.start.getTokenIndex(), getCurrentClassName() + "* self, ");
+							rewriter.insertAfter(fp.start.getTokenIndex(),
+									getCurrentClassName() + "* self, ");
 						}
 					}
 				}
@@ -110,7 +147,19 @@ public class J2CVarScan extends JavaBaseListener {
 		}
 	}
 
-	List<String> methodParams = new ArrayList<String>();
+	private String getTypeText(TypeContext type) {
+		if (type == null)
+			return "void";
+		return type.getText();
+	}
+
+	Map<String, String> methodParams = new HashMap();
+
+	@Override
+	public void enterModifier(ModifierContext ctx) {
+		rewriter.insertBefore(ctx.start, "/*");
+		rewriter.insertAfter(ctx.stop, "*/");
+	}
 
 	@Override
 	public void enterMethodDeclaration(MethodDeclarationContext ctx) {
@@ -119,17 +168,17 @@ public class J2CVarScan extends JavaBaseListener {
 		FormalParameterListContext fpl = fp.formalParameterList();
 		if (fpl == null) {
 		} else {
-			methodParams.addAll(getParamNames(fpl.formalParameter()));
-			System.out.println("params of " + ctx.Identifier().getText() + ":" + methodParams);
+			getParamNames(fpl.formalParameter(), methodParams, fpl);
+			System.out.println("params of " + ctx.Identifier().getText() + ":"
+					+ methodParams);
 		}
 	}
 
-	private List<String> getParamNames(List<FormalParameterContext> list) {
-		List<String> ret = new ArrayList<String>();
+	private void getParamNames(List<FormalParameterContext> list,
+			Map<String, String> map, FormalParameterListContext fpl) {
 		for (FormalParameterContext fp : list) {
-			ret.add(fp.variableDeclaratorId().getText());
+			map.put(fp.variableDeclaratorId().getText(), getTypeText(fp.type()));
 		}
-		return ret;
 	}
 
 	@Override
@@ -149,12 +198,12 @@ public class J2CVarScan extends JavaBaseListener {
 		return s;
 	}
 
-	private List<String> getFieldName(List<VariableDeclaratorContext> list) {
-		List<String> ret = new ArrayList<String>();
+	private void getFieldName(List<VariableDeclaratorContext> list,
+			Map<String, String> map, String type) {
 		for (VariableDeclaratorContext vd : list) {
-			ret.add(vd.variableDeclaratorId().getText());
+			String text = vd.variableDeclaratorId().getText();
+			map.put(text, type);
 		}
-		return ret;
 	}
 
 	@Override
@@ -162,41 +211,62 @@ public class J2CVarScan extends JavaBaseListener {
 		TerminalNode id = ctx.Identifier();
 		if (id != null) {
 			String text = id.getText();
-			if (isClassField(text)) {
+			String type[] = new String[1];
+			if (containsFromList(blockVarList, text, type)) {
+			} else if (methodParams.containsKey(text)) {
+			} else if (containsFromList(clsFieldList, text, type)) {
 				rewriter.insertBefore(id.getSymbol(), "self->");
+			} else if (containsFromList(clsMethodList, text, type)) {
+				rewriter.replace(id.getSymbol(), getCurrentClassName() + "_"
+						+ text);
 			} else {
-				if (containsFromList(clsMethodList, text)) {
-					rewriter.insertBefore(id.getSymbol(), getCurrentClassName() + "_" + text);
-				} else{
-					System.out.println("warn:unknow id:" + text);
-				}
+				System.out.println("warn:unknow id:" + text);
 			}
+
+			if (!isPrimitiveType(type[0])) {
+				int next = ctx.getStop().getTokenIndex() + 1;
+				String t = tokens.get(next).getText();
+				if (".".equals(t)) {
+					rewriter.replace(next, "->");
+				}
+
+			}
+
 		}
 	}
 
-	/** not support nested class fields yet. */
-	private boolean isClassField(String text) {
-		if (containsFromList(blockVarList, text))
-			return false;
-		if (methodParams.contains(text))
-			return false;
-		if (containsFromList(clsFieldList, text))
-			return true;
-		
-		return false;
+	static Set<String> primitity;
+	static {
+		try {
+			primitity = new HashSet(
+					(Collection) PyData
+							.parseAll("[byte,short,int,long,float,double,char,boolean]"));
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 	}
 
-	private boolean containsFromList(Stack<List<String>> list, String text) {
-		for (List<String> lvl : list) {
-			if (lvl.contains(text))
+	private boolean isPrimitiveType(String s) {
+		return primitity.contains(s);
+	}
+
+	private boolean containsFromList(Stack<Map<String, String>> list,
+			String text, String[] type) {
+		for (Map<String, String> lvl : list) {
+			if (lvl.containsKey(text)) {
+				type[0] = lvl.get(text);
 				return true;
+			}
 		}
 		return false;
 	}
 
 	@Override
-	public void enterLocalVariableDeclaration(LocalVariableDeclarationContext ctx) {
-		blockVarList.peek().addAll(getFieldName(ctx.variableDeclarators().variableDeclarator()));
+	public void enterLocalVariableDeclaration(
+			LocalVariableDeclarationContext ctx) {
+
+		getFieldName(ctx.variableDeclarators().variableDeclarator(),
+				blockVarList.peek(), getTypeText(ctx.type()));
 	}
 
 	@Override
@@ -206,14 +276,20 @@ public class J2CVarScan extends JavaBaseListener {
 
 	@Override
 	public void enterBlock(JavaParser.BlockContext ctx) {
-		System.out.println("enter block [" + ctx.start + "," + ctx.stop + "]");
+		System.out.println("enter block [" + ctx.start + "," + ctx.stop);
 		for (BlockStatementContext bs : ctx.blockStatement()) {
-			LocalVariableDeclarationStatementContext lvds = bs.localVariableDeclarationStatement();
+			LocalVariableDeclarationStatementContext lvds = bs
+					.localVariableDeclarationStatement();
 			if (lvds != null) {
-				System.out.println(
-						getFieldName(lvds.localVariableDeclaration().variableDeclarators().variableDeclarator()));
+				Map<String, String> map = new HashMap();
+
+				getFieldName(lvds.localVariableDeclaration()
+						.variableDeclarators().variableDeclarator(), map,
+						getTypeText(lvds.localVariableDeclaration().type()));
+				System.out.println("local:" + map);
 			}
 		}
-		blockVarList.add(new ArrayList<String>());
+		System.out.println(" --- ]");
+		blockVarList.add(new HashMap());
 	}
 }
