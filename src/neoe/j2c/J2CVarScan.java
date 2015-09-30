@@ -10,6 +10,7 @@ import java.util.Stack;
 
 import neoe.j2c.JavaParser.BlockContext;
 import neoe.j2c.JavaParser.BlockStatementContext;
+import neoe.j2c.JavaParser.ClassBodyContext;
 import neoe.j2c.JavaParser.ClassBodyDeclarationContext;
 import neoe.j2c.JavaParser.ClassDeclarationContext;
 import neoe.j2c.JavaParser.FieldDeclarationContext;
@@ -28,9 +29,6 @@ import neoe.j2c.JavaParser.TypeContext;
 import neoe.j2c.JavaParser.TypeDeclarationContext;
 import neoe.j2c.JavaParser.VariableDeclaratorContext;
 import neoe.util.PyData;
-
-
-
 
 /***
  * Excerpted from "The Definitive ANTLR 4 Reference",
@@ -92,20 +90,21 @@ public class J2CVarScan extends JavaBaseListener {
 	@Override
 	public void enterTypeDeclaration(TypeDeclarationContext ctx) {
 		ClassDeclarationContext cd = ctx.classDeclaration();
-		if (cd!=null){
-		rewriter.insertBefore(ctx.start, "// ");
-		rewriter.insertBefore(cd.stop, "// ");
-		rewriter.insertAfter(cd.stop, "/*cls*/\n");
+		if (cd != null) {
+			rewriter.insertBefore(ctx.start, "// ");
+			rewriter.insertBefore(cd.stop, "// ");
+			rewriter.insertAfter(cd.stop, "/*cls*/\n");
 		}
-	}	
+	}
 
 	@Override
 	public void enterClassDeclaration(JavaParser.ClassDeclarationContext ctx) {
 		System.out.println("enter class [" + ctx.Identifier() + "|" + ctx.start
 				+ "," + ctx.stop + "]");
 		clsNames.add(ctx.Identifier().getText());
-		
-		System.out.println("cls=" + getCurrentClassName());
+
+		String clsName;
+		System.out.println("cls=" + (clsName = getCurrentClassName()));
 		JavaParser.ClassBodyContext body = ctx.classBody();
 		Map<String, String> clsFields = new HashMap();
 		clsFieldList.add(clsFields);
@@ -121,8 +120,9 @@ public class J2CVarScan extends JavaBaseListener {
 						getFieldName(fd.variableDeclarators()
 								.variableDeclarator(), clsFields,
 								getTypeText(fd.type()));
-
+						
 					}
+					
 				}
 				{
 					MethodDeclarationContext med = md.methodDeclaration();
@@ -145,6 +145,21 @@ public class J2CVarScan extends JavaBaseListener {
 				}
 			}
 		}
+		
+		String def = addClassDef(clsName, clsFields);
+		rewriter.insertAfter(ctx.classBody().start, def);
+	}
+
+	private String addClassDef(String clsName, Map<String, String> clsFields) {
+		StringBuilder sb = new StringBuilder();
+		sb.append("\n typedef struct { \n");
+		for (String name : clsFields.keySet()) {
+			sb.append("\t").append(clsFields.get(name)).append(" ")
+					.append(name).append(";\n");
+		}
+		sb.append(" } ");
+		sb.append(clsName).append(";   \n");
+		return sb.toString();
 	}
 
 	private String getTypeText(TypeContext type) {
