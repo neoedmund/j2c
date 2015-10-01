@@ -3,16 +3,17 @@ An practical approach to convert Java source to C source.
 
 
 ### The Philosophy
-> Let this tool to finish about 80% trivial works, and we still need hand adjustment.
-> And we need to implement Java libaray classes ourselves, the subset of them used in the task.
+Let this tool to finish about 80% trivial works, and we still need hand adjustment.
+And we need to implement Java libaray classes ourselves, the subset of them used in the task.
 
 ### The Approach
 
-> First of all, I need to know how to translate Java source to C source.
-> Java's grammar is similar to C, so I feel lucky.
-> The most important work here is translate Java OOP to C style.
-> I do like this, better be explained by example.
-> I have a Java class like this:
+First of all, I need to know how to translate Java source to C source.
+Java's grammar is similar to C, so I feel lucky.
+The most important work here is translate Java OOP to C style.
+I do like this, better be explained by example.
+I have a Java class like this:
+
 ```
 public static class LoopStringBuffer {
 
@@ -47,7 +48,9 @@ public static class LoopStringBuffer {
     }
 ```
 
-> I make class field to a C struct, and flat the class methods.
+
+I make class field to a C struct, and flat the class methods.
+
 
 ```
  /*public*/ /*static*/ class LoopStringBuffer {
@@ -106,15 +109,16 @@ public static class LoopStringBuffer {
     }
 
 // }/*cls*/
+
 ```
 
-> Here you can see, I make some transform like:
->   - add self pointer (not use "this", like python :)
->   - "." to "->"
->   - class construct by class_Init
->   - keep all text in original java file, like comments.
->   - more...
-> And it's not perfect, not even compilable. But I feel it has a good start.
+Here you can see, I make some transform like:
+  - add self pointer (not use "this", like python :)
+  - "." to "->"
+  - class construct by class_Init
+  - keep all text in original java file, like comments.
+  - more...
+And it's not perfect, not even compilable. But I feel it has a good start.
   
 ### Tech
 I use ANTLR4 for java parse.
