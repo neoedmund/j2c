@@ -23,7 +23,7 @@
 
     //static Map cache = new HashMap();
 
-    /*static*/ char EOF = (char) -1;
+    /*static*/ // char EOF = (char) -1;
 
     /*public*/ /*static*/ void neoe_util_PyData_main(neoe_util_PyData* self, String*[] args) throws Exception {
         BufferedReader* in =  BufferedReader_Init( StringReader_Init(
@@ -44,9 +44,9 @@
         return o;
     }
 
-    StringBuffer* buf =  StringBuffer_Init();
+    // StringBuffer* buf =  StringBuffer_Init();
 
-    int lno = 1, pos;
+    // int lno = 1, pos;
 
     String* neoe_util_PyData_at(neoe_util_PyData* self) {
         return " at line:" + self->lno + " pos:" + self->pos;
@@ -267,19 +267,19 @@
  } neoe_util_PyData_LoopStringBuffer;   
 
 
-        /*private*/ int*[] cs;
-        /*private*/ int p;
-        /*private*/ int size;
+        /*private*/ // int*[] cs;
+        /*private*/ // int p;
+        /*private*/ // int size;
 
-        LoopStringBuffer(int size) {
-            this.size = self->size;
+        void LoopStringBuffer_Init(neoe_util_PyData_LoopStringBuffer* self, int size) {
+            self->size = size;
             self->p = 0;
-            self->cs =  int_Init[self->size];
+            self->cs =  int_Init[size];
         }
 
         void neoe_util_PyData_LoopStringBuffer_add(neoe_util_PyData_LoopStringBuffer* self, int c) {
             self->cs[self->p++] = (char) c;
-            if (self->p >= self->size) {
+            if (self->p >= size) {
                 self->p = 0;
             }
         }

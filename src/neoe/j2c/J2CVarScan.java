@@ -13,12 +13,15 @@ import neoe.j2c.JavaParser.BlockStatementContext;
 import neoe.j2c.JavaParser.ClassBodyContext;
 import neoe.j2c.JavaParser.ClassBodyDeclarationContext;
 import neoe.j2c.JavaParser.ClassDeclarationContext;
+import neoe.j2c.JavaParser.ConstantDeclaratorContext;
+import neoe.j2c.JavaParser.ConstructorDeclarationContext;
 import neoe.j2c.JavaParser.CreatorContext;
 import neoe.j2c.JavaParser.FieldDeclarationContext;
 import neoe.j2c.JavaParser.FormalParameterContext;
 import neoe.j2c.JavaParser.FormalParameterListContext;
 import neoe.j2c.JavaParser.FormalParametersContext;
 import neoe.j2c.JavaParser.ImportDeclarationContext;
+import neoe.j2c.JavaParser.LiteralContext;
 import neoe.j2c.JavaParser.LocalVariableDeclarationContext;
 import neoe.j2c.JavaParser.LocalVariableDeclarationStatementContext;
 import neoe.j2c.JavaParser.MemberDeclarationContext;
@@ -30,6 +33,7 @@ import neoe.j2c.JavaParser.TypeContext;
 import neoe.j2c.JavaParser.TypeDeclarationContext;
 import neoe.j2c.JavaParser.VariableDeclaratorContext;
 import neoe.util.PyData;
+
 
 
 /***
@@ -102,21 +106,44 @@ public class J2CVarScan extends JavaBaseListener {
 	@Override
 	public void enterCreator(CreatorContext ctx) {
 		int prev;
-		String t = tokens.get(prev=ctx.start.getTokenIndex()-2).getText();
-		if("new".equals(t)){
+		String t = tokens.get(prev = ctx.start.getTokenIndex() - 2).getText();
+		if ("new".equals(t)) {
 			rewriter.replace(prev, "");
-			rewriter.replace(ctx.createdName().start, ctx.createdName().getText()+"_Init");
-		}else{
-			System.out.println("warn: new!="+t);
+			rewriter.replace(ctx.createdName().start, ctx.createdName()
+					.getText() + "_Init");
+		} else {
+			System.out.println("warn: new!=" + t);
 		}
 	}
 
 	@Override
 	public void enterType(TypeContext ctx) {
-		String t= getTypeText(ctx);
-		if (!isPrimitiveType(t)){
+		String t = getTypeText(ctx);
+		if (!isPrimitiveType(t)) {
 			rewriter.insertAfter(ctx.start, "*");
 		}
+	}
+
+	@Override
+	public void enterConstructorDeclaration(ConstructorDeclarationContext ctx) {
+		String text = ctx.Identifier().getText();
+		rewriter.insertBefore(ctx.Identifier().getSymbol(),
+				"void ");
+		rewriter.replace(ctx.Identifier().getSymbol(), text + "_Init");
+
+		//
+		assert methodParams.isEmpty();
+		FormalParametersContext fp = ctx.formalParameters();
+		FormalParameterListContext fpl = fp.formalParameterList();
+		if (fpl == null) {
+			rewriter.insertAfter(fp.start, getCurrentClassName()+"* self");
+		} else {
+			rewriter.insertAfter(fp.start, getCurrentClassName()+"* self, ");
+			getParamNames(fpl.formalParameter(), methodParams, fpl);
+			System.out.println("params of " + ctx.Identifier().getText() + ":"
+					+ methodParams);
+		}
+
 	}
 
 	@Override
@@ -142,9 +169,9 @@ public class J2CVarScan extends JavaBaseListener {
 						getFieldName(fd.variableDeclarators()
 								.variableDeclarator(), clsFields,
 								getTypeText(fd.type()));
-						
+						rewriter.insertBefore(fd.start, "// ");
 					}
-					
+
 				}
 				{
 					MethodDeclarationContext med = md.methodDeclaration();
@@ -167,7 +194,7 @@ public class J2CVarScan extends JavaBaseListener {
 				}
 			}
 		}
-		
+
 		String def = addClassDef(clsName, clsFields);
 		rewriter.insertAfter(ctx.classBody().start, def);
 	}
@@ -244,19 +271,42 @@ public class J2CVarScan extends JavaBaseListener {
 	}
 
 	@Override
+	public void enterLiteral(LiteralContext ctx) {
+		
+	}
+
+	@Override
 	public void enterPrimary(PrimaryContext ctx) {
+		
+		{
+			// this. -> self->
+			String text = ctx.getText();
+			if ("this".equals(text)) {
+				rewriter.replace(ctx.start, "self");
+				int next = ctx.start.getTokenIndex()+1;
+				if (".".equals(tokens.get(next).getText())){
+					rewriter.replace(next, "->");
+				}
+				return;
+			} 
+			
+		}
+		
+		
+		
 		TerminalNode id = ctx.Identifier();
+		
 		if (id != null) {
 			String text = id.getText();
 			String type[] = new String[1];
-			if (containsFromList(blockVarList, text, type)) {
+			 if (containsFromList(blockVarList, text, type)) {
 			} else if (methodParams.containsKey(text)) {
 			} else if (containsFromList(clsFieldList, text, type)) {
 				rewriter.insertBefore(id.getSymbol(), "self->");
 			} else if (containsFromList(clsMethodList, text, type)) {
 				rewriter.replace(id.getSymbol(), getCurrentClassName() + "_"
 						+ text);
-				
+
 			} else {
 				System.out.println("warn:unknow id:" + text);
 			}
@@ -266,7 +316,7 @@ public class J2CVarScan extends JavaBaseListener {
 				String t = tokens.get(next).getText();
 				if (".".equals(t)) {
 					rewriter.replace(next, "->");
-				}else if  ("(".equals(t)) {
+				} else if ("(".equals(t)) {
 					rewriter.insertAfter(next, "self, ");
 				}
 
