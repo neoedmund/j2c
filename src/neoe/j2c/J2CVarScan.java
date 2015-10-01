@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
 
+import neoe.j2c.JavaParser.ArgumentsContext;
 import neoe.j2c.JavaParser.BlockContext;
 import neoe.j2c.JavaParser.BlockStatementContext;
 import neoe.j2c.JavaParser.ClassBodyContext;
@@ -16,6 +17,9 @@ import neoe.j2c.JavaParser.ClassDeclarationContext;
 import neoe.j2c.JavaParser.ConstantDeclaratorContext;
 import neoe.j2c.JavaParser.ConstructorDeclarationContext;
 import neoe.j2c.JavaParser.CreatorContext;
+import neoe.j2c.JavaParser.ExplicitGenericInvocationContext;
+import neoe.j2c.JavaParser.ExplicitGenericInvocationSuffixContext;
+import neoe.j2c.JavaParser.ExpressionContext;
 import neoe.j2c.JavaParser.FieldDeclarationContext;
 import neoe.j2c.JavaParser.FormalParameterContext;
 import neoe.j2c.JavaParser.FormalParameterListContext;
@@ -33,8 +37,6 @@ import neoe.j2c.JavaParser.TypeContext;
 import neoe.j2c.JavaParser.TypeDeclarationContext;
 import neoe.j2c.JavaParser.VariableDeclaratorContext;
 import neoe.util.PyData;
-
-
 
 /***
  * Excerpted from "The Definitive ANTLR 4 Reference",
@@ -116,6 +118,47 @@ public class J2CVarScan extends JavaBaseListener {
 		}
 	}
 
+//	@Override
+//	public void enterExpression(ExpressionContext ctx) {
+//		System.out.println("neoe1");
+//		{ // change class method invoke
+//			// a.b(c) -> class_A_b(a,c),
+//			// FIXME: not work yet
+//			ExplicitGenericInvocationContext inv = ctx
+//					.explicitGenericInvocation();
+//			if (inv != null) {
+//				System.out.println("neoe2");
+//				List<ExpressionContext> targets = ctx.expression();
+//				if (targets != null) {
+//					System.out.println("neoe3");
+//					if (targets.size() != 1) {
+//						System.out.println("warn: need check " + targets);
+//					} else {
+//						System.out.println("neoe4");
+//						String target = targets.get(0).getText();
+//						ExplicitGenericInvocationSuffixContext suf = inv
+//								.explicitGenericInvocationSuffix();
+//						if (suf != null) {
+//							System.out.println("neoe5");
+//							TerminalNode id = suf.Identifier();
+//							if (id != null) {
+//								System.out.println("neoe6");
+//								ArgumentsContext arg = suf.arguments();
+//								rewriter.insertAfter(
+//										arg.start.getTokenIndex() + 1, target
+//												+ ", ");
+//							}
+//
+//						}
+//					}
+//				}else{
+//					System.out.println("target is null");
+//				}
+//
+//			}
+//		}
+//	}
+
 	@Override
 	public void enterType(TypeContext ctx) {
 		String t = getTypeText(ctx);
@@ -127,8 +170,7 @@ public class J2CVarScan extends JavaBaseListener {
 	@Override
 	public void enterConstructorDeclaration(ConstructorDeclarationContext ctx) {
 		String text = ctx.Identifier().getText();
-		rewriter.insertBefore(ctx.Identifier().getSymbol(),
-				"void ");
+		rewriter.insertBefore(ctx.Identifier().getSymbol(), "void ");
 		rewriter.replace(ctx.Identifier().getSymbol(), text + "_Init");
 
 		//
@@ -136,9 +178,9 @@ public class J2CVarScan extends JavaBaseListener {
 		FormalParametersContext fp = ctx.formalParameters();
 		FormalParameterListContext fpl = fp.formalParameterList();
 		if (fpl == null) {
-			rewriter.insertAfter(fp.start, getCurrentClassName()+"* self");
+			rewriter.insertAfter(fp.start, getCurrentClassName() + "* self");
 		} else {
-			rewriter.insertAfter(fp.start, getCurrentClassName()+"* self, ");
+			rewriter.insertAfter(fp.start, getCurrentClassName() + "* self, ");
 			getParamNames(fpl.formalParameter(), methodParams, fpl);
 			System.out.println("params of " + ctx.Identifier().getText() + ":"
 					+ methodParams);
@@ -272,34 +314,32 @@ public class J2CVarScan extends JavaBaseListener {
 
 	@Override
 	public void enterLiteral(LiteralContext ctx) {
-		
+
 	}
 
 	@Override
 	public void enterPrimary(PrimaryContext ctx) {
-		
+
 		{
 			// this. -> self->
 			String text = ctx.getText();
 			if ("this".equals(text)) {
 				rewriter.replace(ctx.start, "self");
-				int next = ctx.start.getTokenIndex()+1;
-				if (".".equals(tokens.get(next).getText())){
+				int next = ctx.start.getTokenIndex() + 1;
+				if (".".equals(tokens.get(next).getText())) {
 					rewriter.replace(next, "->");
 				}
 				return;
-			} 
-			
+			}
+
 		}
-		
-		
-		
+
 		TerminalNode id = ctx.Identifier();
-		
+
 		if (id != null) {
 			String text = id.getText();
 			String type[] = new String[1];
-			 if (containsFromList(blockVarList, text, type)) {
+			if (containsFromList(blockVarList, text, type)) {
 			} else if (methodParams.containsKey(text)) {
 			} else if (containsFromList(clsFieldList, text, type)) {
 				rewriter.insertBefore(id.getSymbol(), "self->");
@@ -310,7 +350,7 @@ public class J2CVarScan extends JavaBaseListener {
 			} else {
 				System.out.println("warn:unknow id:" + text);
 			}
-
+			String clsName = getCurrentClassName();
 			if (!isPrimitiveType(type[0])) {
 				int next = ctx.getStop().getTokenIndex() + 1;
 				String t = tokens.get(next).getText();
