@@ -13,6 +13,7 @@ import neoe.j2c.JavaParser.BlockStatementContext;
 import neoe.j2c.JavaParser.ClassBodyContext;
 import neoe.j2c.JavaParser.ClassBodyDeclarationContext;
 import neoe.j2c.JavaParser.ClassDeclarationContext;
+import neoe.j2c.JavaParser.CreatorContext;
 import neoe.j2c.JavaParser.FieldDeclarationContext;
 import neoe.j2c.JavaParser.FormalParameterContext;
 import neoe.j2c.JavaParser.FormalParameterListContext;
@@ -29,6 +30,7 @@ import neoe.j2c.JavaParser.TypeContext;
 import neoe.j2c.JavaParser.TypeDeclarationContext;
 import neoe.j2c.JavaParser.VariableDeclaratorContext;
 import neoe.util.PyData;
+
 
 /***
  * Excerpted from "The Definitive ANTLR 4 Reference",
@@ -94,6 +96,26 @@ public class J2CVarScan extends JavaBaseListener {
 			rewriter.insertBefore(ctx.start, "// ");
 			rewriter.insertBefore(cd.stop, "// ");
 			rewriter.insertAfter(cd.stop, "/*cls*/\n");
+		}
+	}
+
+	@Override
+	public void enterCreator(CreatorContext ctx) {
+		int prev;
+		String t = tokens.get(prev=ctx.start.getTokenIndex()-2).getText();
+		if("new".equals(t)){
+			rewriter.replace(prev, "");
+			rewriter.replace(ctx.createdName().start, ctx.createdName().getText()+"_Init");
+		}else{
+			System.out.println("warn: new!="+t);
+		}
+	}
+
+	@Override
+	public void enterType(TypeContext ctx) {
+		String t= getTypeText(ctx);
+		if (!isPrimitiveType(t)){
+			rewriter.insertAfter(ctx.start, "*");
 		}
 	}
 
