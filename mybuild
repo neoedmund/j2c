@@ -1,0 +1,9 @@
+{
+baseDir:".",
+prjs:[
+ [j2c,., { cp:["lib/antlr-4.5.1-complete.jar", ]}],  
+],
+destDir:"dist",
+debug:true,
+}
+                                                             

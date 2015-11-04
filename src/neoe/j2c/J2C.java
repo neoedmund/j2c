@@ -28,27 +28,50 @@ public class J2C {
 		String inputFile = null;
 		if (args.length > 0)
 			inputFile = args[0];
-		InputStream is = System.in;
-		if (inputFile != null) {
-			is = new FileInputStream(inputFile);
+		InputStream is;
+		if (inputFile == null) {
+			System.out.println("param javafilename");
+			return;
 		}
-		ANTLRInputStream input = new ANTLRInputStream(is);
+		{
+			ANTLRInputStream input = new ANTLRInputStream(new FileInputStream(inputFile));
 
-		JavaLexer lexer = new JavaLexer(input);
-		CommonTokenStream tokens = new CommonTokenStream(lexer, Token.DEFAULT_CHANNEL);
-		JavaParser parser = new JavaParser(tokens);
-		ParseTree tree = parser.compilationUnit(); // parse
+			JavaLexer lexer = new JavaLexer(input);
+			CommonTokenStream tokens = new CommonTokenStream(lexer, Token.DEFAULT_CHANNEL);
+			JavaParser parser = new JavaParser(tokens);
+			ParseTree tree = parser.compilationUnit(); // parse
 
-		ParseTreeWalker walker = new ParseTreeWalker(); // create standard
-														// walker
-		J2CVarScan varScan = new J2CVarScan(tokens);
-		walker.walk(varScan, tree); // initiate walk of tree with listener
+			ParseTreeWalker walker = new ParseTreeWalker(); // create standard
+															// walker
+			J2CVarScan varScan = new J2CVarScan(tokens);
+			walker.walk(varScan, tree); // initiate walk of tree with listener
 
-		// print back ALTERED stream
-		String cfn = new File(inputFile).getAbsolutePath() + ".j2.c";
-		PrintWriter out = new PrintWriter(new OutputStreamWriter(new FileOutputStream(cfn), "utf8"));
-		out.println(varScan.rewriter.getText());
-		out.close();
-		System.out.println("write to " + cfn);
+			// print back ALTERED stream
+			String cfn = new File(inputFile).getAbsolutePath() + ".j2.c";
+			PrintWriter out = new PrintWriter(new OutputStreamWriter(new FileOutputStream(cfn), "utf8"));
+			out.println(varScan.rewriter.getText());
+			out.close();
+			System.out.println("write to " + cfn);
+		}
+		{
+			ANTLRInputStream input = new ANTLRInputStream(new FileInputStream(inputFile));
+
+			JavaLexer lexer = new JavaLexer(input);
+			CommonTokenStream tokens = new CommonTokenStream(lexer, Token.DEFAULT_CHANNEL);
+			JavaParser parser = new JavaParser(tokens);
+			ParseTree tree = parser.compilationUnit(); // parse
+
+			ParseTreeWalker walker = new ParseTreeWalker(); // create standard
+															// walker
+			J2CVarScanH varScan = new J2CVarScanH(tokens);
+			walker.walk(varScan, tree); // initiate walk of tree with listener
+
+			// print back ALTERED stream
+			String cfn = new File(inputFile).getAbsolutePath() + ".j2.h";
+			PrintWriter out = new PrintWriter(new OutputStreamWriter(new FileOutputStream(cfn), "utf8"));
+			out.println(varScan.rewriter.getText());
+			out.close();
+			System.out.println("write to " + cfn);
+		}
 	}
 }

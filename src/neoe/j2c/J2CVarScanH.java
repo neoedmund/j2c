@@ -14,6 +14,7 @@ import neoe.j2c.JavaParser.BlockStatementContext;
 import neoe.j2c.JavaParser.ClassBodyContext;
 import neoe.j2c.JavaParser.ClassBodyDeclarationContext;
 import neoe.j2c.JavaParser.ClassDeclarationContext;
+import neoe.j2c.JavaParser.CompilationUnitContext;
 import neoe.j2c.JavaParser.ConstantDeclaratorContext;
 import neoe.j2c.JavaParser.ConstructorDeclarationContext;
 import neoe.j2c.JavaParser.CreatorContext;
@@ -59,14 +60,14 @@ import org.antlr.v4.runtime.tree.TerminalNode;
  * @author neoe
  *
  */
-public class J2CVarScan extends JavaBaseListener {
+public class J2CVarScanH extends JavaBaseListener {
 	TokenStreamRewriter rewriter;
 	private String pkg;
 	/** support nested class */
 	private Stack<String> clsNames = new Stack<String>();
 	private TokenStream tokens;
 
-	public J2CVarScan(TokenStream tokens) {
+	public J2CVarScanH(TokenStream tokens) {
 		rewriter = new TokenStreamRewriter(tokens);
 		this.tokens = tokens;
 	}
@@ -94,15 +95,26 @@ public class J2CVarScan extends JavaBaseListener {
 	Stack<Map<String, String>> clsFieldList = new Stack();
 	Stack<Map<String, String>> clsMethodList = new Stack();
 	Stack<Map<String, String>> blockVarList = new Stack();
+	private String firstClassName;
 
 	@Override
-	public void enterTypeDeclaration(TypeDeclarationContext ctx) {
+	public void exitTypeDeclaration(TypeDeclarationContext ctx) {
 		ClassDeclarationContext cd = ctx.classDeclaration();
 		if (cd != null) {
+			String clsName = firstClassName;
 			rewriter.insertBefore(ctx.start, "// ");
 			rewriter.insertBefore(cd.stop, "// ");
 			rewriter.insertAfter(cd.stop, "/*cls*/\n");
 		}
+		// rewriter.insertBefore(body.start, );
+
+	}
+
+	@Override
+	public void exitCompilationUnit(CompilationUnitContext ctx) {
+		String clsName = firstClassName;
+		rewriter.insertBefore(ctx.start, String.format("#ifndef _%s_H\n#define _%s_H\n", clsName, clsName));
+		rewriter.insertAfter(ctx.stop, String.format("#endif\n"));
 	}
 
 	@Override
@@ -116,47 +128,6 @@ public class J2CVarScan extends JavaBaseListener {
 			System.out.println("warn: new!=" + t);
 		}
 	}
-
-	// @Override
-	// public void enterExpression(ExpressionContext ctx) {
-	// System.out.println("neoe1");
-	// { // change class method invoke
-	// // a.b(c) -> class_A_b(a,c),
-	// // FIXME: not work yet
-	// ExplicitGenericInvocationContext inv = ctx
-	// .explicitGenericInvocation();
-	// if (inv != null) {
-	// System.out.println("neoe2");
-	// List<ExpressionContext> targets = ctx.expression();
-	// if (targets != null) {
-	// System.out.println("neoe3");
-	// if (targets.size() != 1) {
-	// System.out.println("warn: need check " + targets);
-	// } else {
-	// System.out.println("neoe4");
-	// String target = targets.get(0).getText();
-	// ExplicitGenericInvocationSuffixContext suf = inv
-	// .explicitGenericInvocationSuffix();
-	// if (suf != null) {
-	// System.out.println("neoe5");
-	// TerminalNode id = suf.Identifier();
-	// if (id != null) {
-	// System.out.println("neoe6");
-	// ArgumentsContext arg = suf.arguments();
-	// rewriter.insertAfter(
-	// arg.start.getTokenIndex() + 1, target
-	// + ", ");
-	// }
-	//
-	// }
-	// }
-	// }else{
-	// System.out.println("target is null");
-	// }
-	//
-	// }
-	// }
-	// }
 
 	@Override
 	public void enterType(TypeContext ctx) {
@@ -229,7 +200,10 @@ public class J2CVarScan extends JavaBaseListener {
 
 		String clsName;
 		System.out.println("cls=" + (clsName = getCurrentClassName()));
+		if (firstClassName == null)
+			firstClassName = clsName;
 		JavaParser.ClassBodyContext body = ctx.classBody();
+
 		Map<String, String> clsFields = new HashMap();
 		clsFieldList.add(clsFields);
 		HashMap ml;
@@ -421,6 +395,12 @@ public class J2CVarScan extends JavaBaseListener {
 	@Override
 	public void exitBlock(BlockContext ctx) {
 		blockVarList.pop();
+		// for (int i = ctx.start.getTokenIndex(); i < ctx.stop.getTokenIndex();
+		// i++) {
+		// rewriter.replace(i, "");
+		// }
+		// rewriter.replace(ctx.stop, ";\n");
+		rewriter.replace(ctx.start, ctx.stop, ";\n");
 	}
 
 	@Override
@@ -438,5 +418,6 @@ public class J2CVarScan extends JavaBaseListener {
 		}
 		System.out.println(" --- ]");
 		blockVarList.add(new HashMap());
+
 	}
 }
