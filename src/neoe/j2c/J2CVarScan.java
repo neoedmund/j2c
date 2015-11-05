@@ -130,7 +130,7 @@ public class J2CVarScan extends JavaBaseListener {
 
 	static Map getPrimMap() throws Exception {
 		if (primMap == null)
-			primMap = (Map) PyData.parseAll("{byte:uint8_t,char:uint16_t,short:uint16_t,int:uint32_t,long:uint64_t}");
+			primMap = (Map) PyData.parseAll("{byte:uint8_t,char:uint16_t,short:uint16_t,int:uint32_t,long:uint64_t,boolean:bool}");
 		return primMap;
 	}
 
