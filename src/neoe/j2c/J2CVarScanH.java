@@ -8,37 +8,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
 
-import neoe.j2c.JavaParser.ArgumentsContext;
-import neoe.j2c.JavaParser.BlockContext;
-import neoe.j2c.JavaParser.BlockStatementContext;
-import neoe.j2c.JavaParser.ClassBodyContext;
-import neoe.j2c.JavaParser.ClassBodyDeclarationContext;
-import neoe.j2c.JavaParser.ClassDeclarationContext;
-import neoe.j2c.JavaParser.CompilationUnitContext;
-import neoe.j2c.JavaParser.ConstantDeclaratorContext;
-import neoe.j2c.JavaParser.ConstructorDeclarationContext;
-import neoe.j2c.JavaParser.CreatorContext;
-import neoe.j2c.JavaParser.ExplicitGenericInvocationContext;
-import neoe.j2c.JavaParser.ExplicitGenericInvocationSuffixContext;
-import neoe.j2c.JavaParser.ExpressionContext;
-import neoe.j2c.JavaParser.FieldDeclarationContext;
-import neoe.j2c.JavaParser.FormalParameterContext;
-import neoe.j2c.JavaParser.FormalParameterListContext;
-import neoe.j2c.JavaParser.FormalParametersContext;
-import neoe.j2c.JavaParser.ImportDeclarationContext;
-import neoe.j2c.JavaParser.LiteralContext;
-import neoe.j2c.JavaParser.LocalVariableDeclarationContext;
-import neoe.j2c.JavaParser.LocalVariableDeclarationStatementContext;
-import neoe.j2c.JavaParser.MemberDeclarationContext;
-import neoe.j2c.JavaParser.MethodDeclarationContext;
-import neoe.j2c.JavaParser.ModifierContext;
-import neoe.j2c.JavaParser.PackageDeclarationContext;
-import neoe.j2c.JavaParser.PrimaryContext;
-import neoe.j2c.JavaParser.TypeContext;
-import neoe.j2c.JavaParser.TypeDeclarationContext;
-import neoe.j2c.JavaParser.VariableDeclaratorContext;
-import neoe.util.PyData;
-
 /***
  * Excerpted from "The Definitive ANTLR 4 Reference",
  * published by The Pragmatic Bookshelf.
@@ -50,6 +19,26 @@ import neoe.util.PyData;
 import org.antlr.v4.runtime.TokenStream;
 import org.antlr.v4.runtime.TokenStreamRewriter;
 import org.antlr.v4.runtime.tree.TerminalNode;
+
+import neoe.j2c.JavaParser.BlockContext;
+import neoe.j2c.JavaParser.ClassBodyDeclarationContext;
+import neoe.j2c.JavaParser.ClassDeclarationContext;
+import neoe.j2c.JavaParser.CompilationUnitContext;
+import neoe.j2c.JavaParser.ConstructorDeclarationContext;
+import neoe.j2c.JavaParser.CreatorContext;
+import neoe.j2c.JavaParser.FieldDeclarationContext;
+import neoe.j2c.JavaParser.FormalParameterContext;
+import neoe.j2c.JavaParser.FormalParameterListContext;
+import neoe.j2c.JavaParser.FormalParametersContext;
+import neoe.j2c.JavaParser.ImportDeclarationContext;
+import neoe.j2c.JavaParser.MemberDeclarationContext;
+import neoe.j2c.JavaParser.MethodDeclarationContext;
+import neoe.j2c.JavaParser.ModifierContext;
+import neoe.j2c.JavaParser.PackageDeclarationContext;
+import neoe.j2c.JavaParser.TypeContext;
+import neoe.j2c.JavaParser.TypeDeclarationContext;
+import neoe.j2c.JavaParser.VariableDeclaratorContext;
+import neoe.util.PyData;
 
 /**
  * Hope to solve 80% of problem of java to c. 1. change method signature(name,
@@ -76,7 +65,7 @@ public class J2CVarScanH extends JavaBaseListener {
 	public void enterPackageDeclaration(PackageDeclarationContext ctx) {
 		pkg = ctx.qualifiedName().getText();
 		rewriter.insertBefore(ctx.start, "// ");
-		System.out.println("package " + pkg);
+		// System.out.println("package " + pkg);
 	}
 
 	@Override
@@ -140,7 +129,20 @@ public class J2CVarScanH extends JavaBaseListener {
 
 		}
 	}
+	static Set<String> primitity;
 
+	static {
+		try {
+			primitity = new HashSet((Collection) PyData.parseAll("[byte,short,int,long,float,double,char,boolean]"));
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	private boolean isPrimitiveType(String s) {
+		return primitity.contains(s);
+	}
+	
 	static Map primMap;
 
 	static Map getPrimMap() throws Exception {
@@ -175,27 +177,31 @@ public class J2CVarScanH extends JavaBaseListener {
 
 	@Override
 	public void enterConstructorDeclaration(ConstructorDeclarationContext ctx) {
+
+		String cls = getCurrentClassName();
 		String text = ctx.Identifier().getText();
 		rewriter.insertBefore(ctx.Identifier().getSymbol(), "void ");
-		rewriter.replace(ctx.Identifier().getSymbol(), text + "_Init");
+		rewriter.replace(ctx.Identifier().getSymbol(), cls  + "_Init");
 
 		//
 		assert methodParams.isEmpty();
 		FormalParametersContext fp = ctx.formalParameters();
 		FormalParameterListContext fpl = fp.formalParameterList();
 		if (fpl == null) {
-			rewriter.insertAfter(fp.start, getCurrentClassName() + "* self");
+			rewriter.insertAfter(fp.start, cls + "* self");
 		} else {
-			rewriter.insertAfter(fp.start, getCurrentClassName() + "* self, ");
+			rewriter.insertAfter(fp.start, cls + "* self, ");
 			getParamNames(fpl.formalParameter(), methodParams, fpl);
-			System.out.println("params of " + ctx.Identifier().getText() + ":" + methodParams);
+			// System.out.println("params of " + ctx.Identifier().getText() +
+			// ":" + methodParams);
 		}
 
 	}
 
 	@Override
 	public void enterClassDeclaration(JavaParser.ClassDeclarationContext ctx) {
-		System.out.println("enter class [" + ctx.Identifier() + "|" + ctx.start + "," + ctx.stop + "]");
+		// System.out.println("enter class [" + ctx.Identifier() + "|" +
+		// ctx.start + "," + ctx.stop + "]");
 		clsNames.add(ctx.Identifier().getText());
 
 		String clsName;
@@ -275,7 +281,8 @@ public class J2CVarScanH extends JavaBaseListener {
 		if (fpl == null) {
 		} else {
 			getParamNames(fpl.formalParameter(), methodParams, fpl);
-			System.out.println("params of " + ctx.Identifier().getText() + ":" + methodParams);
+			// System.out.println("params of " + ctx.Identifier().getText() +
+			// ":" + methodParams);
 		}
 	}
 
@@ -310,114 +317,11 @@ public class J2CVarScanH extends JavaBaseListener {
 		}
 	}
 
-	@Override
-	public void enterLiteral(LiteralContext ctx) {
-
-	}
-
-	@Override
-	public void enterPrimary(PrimaryContext ctx) {
-
-		{
-			// this. -> self->
-			String text = ctx.getText();
-			if ("this".equals(text)) {
-				rewriter.replace(ctx.start, "self");
-				int next = ctx.start.getTokenIndex() + 1;
-				if (".".equals(tokens.get(next).getText())) {
-					rewriter.replace(next, "->");
-				}
-				return;
-			}
-
-		}
-
-		TerminalNode id = ctx.Identifier();
-
-		if (id != null) {
-			String text = id.getText();
-			String type[] = new String[1];
-			if (containsFromList(blockVarList, text, type)) {
-			} else if (methodParams.containsKey(text)) {
-			} else if (containsFromList(clsFieldList, text, type)) {
-				rewriter.insertBefore(id.getSymbol(), "self->");
-			} else if (containsFromList(clsMethodList, text, type)) {
-				rewriter.replace(id.getSymbol(), getCurrentClassName() + "_" + text);
-
-			} else {
-				System.out.println("warn:unknow id:" + text);
-			}
-			String clsName = getCurrentClassName();
-			if (!isPrimitiveType(type[0])) {
-				int next = ctx.getStop().getTokenIndex() + 1;
-				String t = tokens.get(next).getText();
-				if (".".equals(t)) {
-					rewriter.replace(next, "->");
-				} else if ("(".equals(t)) {
-					rewriter.insertAfter(next, "self, ");
-				}
-
-			}
-
-		}
-	}
-
-	static Set<String> primitity;
-
-	static {
-		try {
-			primitity = new HashSet((Collection) PyData.parseAll("[byte,short,int,long,float,double,char,boolean]"));
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-	}
-
-	private boolean isPrimitiveType(String s) {
-		return primitity.contains(s);
-	}
-
-	private boolean containsFromList(Stack<Map<String, String>> list, String text, String[] type) {
-		for (Map<String, String> lvl : list) {
-			if (lvl.containsKey(text)) {
-				type[0] = lvl.get(text);
-				return true;
-			}
-		}
-		return false;
-	}
-
-	@Override
-	public void enterLocalVariableDeclaration(LocalVariableDeclarationContext ctx) {
-
-		getFieldName(ctx.variableDeclarators().variableDeclarator(), blockVarList.peek(), getTypeText(ctx.type()));
-	}
+	 
 
 	@Override
 	public void exitBlock(BlockContext ctx) {
-		blockVarList.pop();
-		// for (int i = ctx.start.getTokenIndex(); i < ctx.stop.getTokenIndex();
-		// i++) {
-		// rewriter.replace(i, "");
-		// }
-		// rewriter.replace(ctx.stop, ";\n");
 		rewriter.replace(ctx.start, ctx.stop, ";\n");
 	}
 
-	@Override
-	public void enterBlock(JavaParser.BlockContext ctx) {
-		System.out.println("enter block [" + ctx.start + "," + ctx.stop);
-		for (BlockStatementContext bs : ctx.blockStatement()) {
-			LocalVariableDeclarationStatementContext lvds = bs.localVariableDeclarationStatement();
-			if (lvds != null) {
-				Map<String, String> map = new HashMap();
-
-				getFieldName(lvds.localVariableDeclaration().variableDeclarators().variableDeclarator(), map,
-						getTypeText(lvds.localVariableDeclaration().type()));
-				System.out.println("local:" + map);
-			}
-		}
-		System.out.println(" --- ]");
-		blockVarList.add(new HashMap());
-
-	}
 }
