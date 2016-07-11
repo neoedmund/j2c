@@ -130,6 +130,7 @@ I prefer ANTLR4 over JavaCC, because ANTLR4 has a more reasonable grammar's gram
 
 ### Why open source with GPL?
 I realize this project need continuous improvements. I need these improvements merged in.
+(Linux said being success because of GPL, but this is a LIE! No another GPL licensed project successed because of it.)
 
 ### contact
 neoedmund at gmail.
